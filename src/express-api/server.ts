@@ -8,6 +8,7 @@ import ipfs from '../adaptors/connect-ipfs';
 import { pool } from '../adaptors/connect-postgre';
 import { logSuccess, logError } from '../postgres/postges-logger';
 import { newLogger } from '@subsocial/utils';
+import * as multer from 'multer';
 
 require("dotenv").config();
 const LIMIT = process.env.PGLIMIT || '20';
@@ -25,12 +26,25 @@ app.use(bodyParser.json({ limit: fileSizeLimit }));
 
 // for parsing application/xwww-
 app.use(bodyParser.urlencoded({ extended: true, limit: fileSizeLimit }));
-//form-urlencoded
 
-// // for parsing multipart/form-data
+const upload = multer({ limits: { fieldSize: parseInt(fileSizeLimit) * 1024 * 1024 }})
 
-// app.use(upload.array());
-// app.use(express.static('public'));
+app.post('/upload', upload.single('picture'), async (req, res) => {
+
+  if (req.file.size > parseInt(fileSizeLimit) * 1024 * 1024) {
+    res.statusCode = 400
+    res.json({ status: 'error', message: `Image should be less than ${parseInt(fileSizeLimit)} MB` })
+  }
+  const finalImg = {
+      name: req.file.originalname,
+      image:  req.file.buffer
+  };
+  
+  const hash = await ipfs.saveContent(finalImg as any);
+  log.info('Image saved to IPFS with hash:', hash);
+
+  res.json({ status: 'ok', hash });
+})
 
 // IPFS API
 
